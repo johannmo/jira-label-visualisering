@@ -345,6 +345,32 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
     return result;
   }, [categories]);
 
+  // Generer assignee-fordeling per kategori
+  const assigneeDataByCategory = useMemo(() => {
+    const result = {};
+    
+    categories.forEach((suffixMap, prefix) => {
+      const assigneeCounts = new Map();
+      
+      // Tell kor mange saker kvar assignee har med denne kategori-prefixen
+      issues.forEach(issue => {
+        const hasPrefix = (issue.labels || []).some(label => label.startsWith(prefix + '-'));
+        if (hasPrefix && issue.assignee) {
+          assigneeCounts.set(issue.assignee, (assigneeCounts.get(issue.assignee) || 0) + 1);
+        }
+      });
+      
+      result[prefix] = Array.from(assigneeCounts.entries())
+        .map(([assignee, count]) => ({
+          name: assignee,
+          value: count,
+        }))
+        .sort((a, b) => b.value - a.value);
+    });
+    
+    return result;
+  }, [categories, issues]);
+
   const categoryList = Array.from(categories.keys());
   const displayCategories = prefixFilter ? [prefixFilter] : categoryList;
 
@@ -465,6 +491,15 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
             chartType={chartType}
           />
         ))}
+        {prefixFilter && assigneeDataByCategory[prefixFilter]?.length > 0 && (
+          <ChartSection
+            key={`${prefixFilter}-assignees`}
+            title={`Tilordna personar (${DEFAULT_CATEGORIES[prefixFilter]?.name || prefixFilter})`}
+            data={assigneeDataByCategory[prefixFilter]}
+            colors={['#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#84cc16']}
+            chartType={chartType}
+          />
+        )}
       </div>
 
     </div>
