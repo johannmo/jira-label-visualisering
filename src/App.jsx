@@ -26,21 +26,21 @@ const DEFAULT_CATEGORIES = {
 
 // Demo-data for visning utan API-tilkopling
 const DEMO_ISSUES = [
-  { key: 'DEMO-1', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-backend'] },
-  { key: 'DEMO-2', labels: ['type-vedlikehald', 'domene-2', 'tema-frontend'] },
-  { key: 'DEMO-3', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-integrasjon'] },
-  { key: 'DEMO-4', labels: ['type-utforsking', 'domene-3', 'tema-backend'] },
-  { key: 'DEMO-5', labels: ['type-vedlikehald', 'domene-1', 'tema-backend'] },
-  { key: 'DEMO-6', labels: ['type-ny-funksjonalitet', 'domene-2', 'tema-frontend'] },
-  { key: 'DEMO-7', labels: ['type-utforsking', 'domene-2', 'tema-integrasjon'] },
-  { key: 'DEMO-8', labels: ['type-vedlikehald', 'domene-3', 'tema-backend'] },
-  { key: 'DEMO-9', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-frontend'] },
-  { key: 'DEMO-10', labels: ['type-ny-funksjonalitet', 'domene-2', 'tema-backend'] },
-  { key: 'DEMO-11', labels: ['type-vedlikehald', 'domene-1', 'tema-integrasjon'] },
-  { key: 'DEMO-12', labels: ['type-utforsking', 'domene-3', 'tema-frontend'] },
-  { key: 'DEMO-13', labels: ['type-ny-funksjonalitet', 'domene-3', 'tema-backend'] },
-  { key: 'DEMO-14', labels: ['type-vedlikehald', 'domene-2', 'tema-backend'] },
-  { key: 'DEMO-15', labels: ['type-utforsking', 'domene-1', 'tema-frontend'] },
+  { key: 'DEMO-1', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-backend'], assignee: 'ola.nordmann' },
+  { key: 'DEMO-2', labels: ['type-vedlikehald', 'domene-2', 'tema-frontend'], assignee: 'kari.hansen' },
+  { key: 'DEMO-3', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-integrasjon'], assignee: 'ola.nordmann' },
+  { key: 'DEMO-4', labels: ['type-utforsking', 'domene-3', 'tema-backend'], assignee: 'per.jensen' },
+  { key: 'DEMO-5', labels: ['type-vedlikehald', 'domene-1', 'tema-backend'], assignee: 'kari.hansen' },
+  { key: 'DEMO-6', labels: ['type-ny-funksjonalitet', 'domene-2', 'tema-frontend'], assignee: 'ola.nordmann' },
+  { key: 'DEMO-7', labels: ['type-utforsking', 'domene-2', 'tema-integrasjon'], assignee: 'per.jensen' },
+  { key: 'DEMO-8', labels: ['type-vedlikehald', 'domene-3', 'tema-backend'], assignee: 'kari.hansen' },
+  { key: 'DEMO-9', labels: ['type-ny-funksjonalitet', 'domene-1', 'tema-frontend'], assignee: 'ola.nordmann' },
+  { key: 'DEMO-10', labels: ['type-ny-funksjonalitet', 'domene-2', 'tema-backend'], assignee: 'per.jensen' },
+  { key: 'DEMO-11', labels: ['type-vedlikehald', 'domene-1', 'tema-integrasjon'], assignee: 'kari.hansen' },
+  { key: 'DEMO-12', labels: ['type-utforsking', 'domene-3', 'tema-frontend'], assignee: 'ola.nordmann' },
+  { key: 'DEMO-13', labels: ['type-ny-funksjonalitet', 'domene-3', 'tema-backend'], assignee: 'per.jensen' },
+  { key: 'DEMO-14', labels: ['type-vedlikehald', 'domene-2', 'tema-backend'], assignee: 'kari.hansen' },
+  { key: 'DEMO-15', labels: ['type-utforsking', 'domene-1', 'tema-frontend'], assignee: 'ola.nordmann' },
 ];
 
 // VIKTIG: Oppdater denne URL-en med din Cloudflare Worker URL
@@ -274,13 +274,35 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
   const [startDate, setStartDate] = useState(localStorage.getItem('jira_start_date') || '');
   const [endDate, setEndDate] = useState(localStorage.getItem('jira_end_date') || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedAssignees, setSelectedAssignees] = useState(new Set());
 
   const handleRefresh = async () => {
     localStorage.setItem('jira_start_date', startDate);
     localStorage.setItem('jira_end_date', endDate);
     setIsRefreshing(true);
-    await onRefresh(startDate, endDate);
+    await onRefresh(startDate, endDate, Array.from(selectedAssignees));
     setIsRefreshing(false);
+  };
+
+  // Hent unike assignees frå issues
+  const assignees = useMemo(() => {
+    const uniqueAssignees = new Set();
+    issues.forEach(issue => {
+      if (issue.assignee) {
+        uniqueAssignees.add(issue.assignee);
+      }
+    });
+    return Array.from(uniqueAssignees).sort();
+  }, [issues]);
+
+  const toggleAssignee = (assignee) => {
+    const newSelected = new Set(selectedAssignees);
+    if (newSelected.has(assignee)) {
+      newSelected.delete(assignee);
+    } else {
+      newSelected.add(assignee);
+    }
+    setSelectedAssignees(newSelected);
   };
 
   // Analyser labels og finn kategoriar automatisk
@@ -407,6 +429,32 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
         ))}
       </div>
 
+      {!isDemo && assignees.length > 0 && (
+        <div className="assignee-filter">
+          <span className="filter-label">Filtrer etter utviklar:</span>
+          <div className="assignee-checkboxes">
+            {assignees.map(assignee => (
+              <label key={assignee} className="assignee-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedAssignees.has(assignee)}
+                  onChange={() => toggleAssignee(assignee)}
+                />
+                <span>{assignee}</span>
+              </label>
+            ))}
+          </div>
+          {selectedAssignees.size > 0 && (
+            <button 
+              className="clear-assignees"
+              onClick={() => setSelectedAssignees(new Set())}
+            >
+              Fjern alle (✕)
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="charts-grid">
         {displayCategories.map(cat => (
           <ChartSection
@@ -431,7 +479,7 @@ export default function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [connectionConfig, setConnectionConfig] = useState(null);
 
-  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate }) => {
+  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees }) => {
     setLoading(true);
     setError(null);
 
@@ -443,6 +491,10 @@ export default function App() {
       }
       if (endDate) {
         jql += ` AND updated <= "${endDate}"`;
+      }
+      if (assignees && assignees.length > 0) {
+        const assigneeList = assignees.map(a => `"${a}"`).join(', ');
+        jql += ` AND assignee IN (${assigneeList})`;
       }
       
       jql += ` ORDER BY updated DESC`;
@@ -460,7 +512,7 @@ export default function App() {
           
           requestBody: {
             jql: jql,
-            fields: ['key', 'summary', 'labels'],
+            fields: ['key', 'summary', 'labels', 'assignee'],
             maxResults: 100,
           },
         }),
@@ -488,6 +540,7 @@ export default function App() {
         key: issue.key,
         summary: issue.fields?.summary || '',
         labels: issue.fields?.labels || [],
+        assignee: issue.fields?.assignee?.name || issue.fields?.assignee?.displayName || null,
       }));
 
       setIssues(mappedIssues);
@@ -515,9 +568,9 @@ export default function App() {
     fetchJiraIssues(config);
   };
 
-  const handleRefresh = async (startDate, endDate) => {
+  const handleRefresh = async (startDate, endDate, assignees) => {
     if (connectionConfig) {
-      await fetchJiraIssues({ ...connectionConfig, startDate, endDate });
+      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees });
     }
   };
 
