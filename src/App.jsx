@@ -275,12 +275,14 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
   const [endDate, setEndDate] = useState(localStorage.getItem('jira_end_date') || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedAssignees, setSelectedAssignees] = useState(new Set());
+  const [selectedDomain, setSelectedDomain] = useState(localStorage.getItem('jira_selected_domain') || '');
 
   const handleRefresh = async () => {
     localStorage.setItem('jira_start_date', startDate);
     localStorage.setItem('jira_end_date', endDate);
+    localStorage.setItem('jira_selected_domain', selectedDomain);
     setIsRefreshing(true);
-    await onRefresh(startDate, endDate, Array.from(selectedAssignees));
+    await onRefresh(startDate, endDate, Array.from(selectedAssignees), selectedDomain);
     setIsRefreshing(false);
   };
 
@@ -304,6 +306,19 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
     }
     setSelectedAssignees(newSelected);
   };
+
+  // Hent unike domener frå issues
+  const domains = useMemo(() => {
+    const uniqueDomains = new Set();
+    issues.forEach(issue => {
+      (issue.labels || []).forEach(label => {
+        if (label.startsWith('domene-')) {
+          uniqueDomains.add(label);
+        }
+      });
+    });
+    return Array.from(uniqueDomains).sort();
+  }, [issues]);
 
   // Analyser labels og finn kategoriar automatisk
   const { categories, labelData } = useMemo(() => {
@@ -400,6 +415,21 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
                 placeholder="Sluttdato"
                 title="Sluttdato"
               />
+              {domains.length > 0 && (
+                <select
+                  value={selectedDomain}
+                  onChange={(e) => setSelectedDomain(e.target.value)}
+                  className="domain-select"
+                  title="Velg domene"
+                >
+                  <option value="">Alle domene</option>
+                  {domains.map(domain => (
+                    <option key={domain} value={domain}>
+                      {domain.replace('domene-', '').charAt(0).toUpperCase() + domain.replace('domene-', '').slice(1)}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button 
                 onClick={handleRefresh} 
                 className="btn-refresh"
@@ -514,7 +544,7 @@ export default function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [connectionConfig, setConnectionConfig] = useState(null);
 
-  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees }) => {
+  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees, domain }) => {
     setLoading(true);
     setError(null);
 
@@ -530,6 +560,9 @@ export default function App() {
       if (assignees && assignees.length > 0) {
         const assigneeList = assignees.map(a => `"${a}"`).join(', ');
         jql += ` AND assignee IN (${assigneeList})`;
+      }
+      if (domain) {
+        jql += ` AND labels = "${domain}"`;
       }
       
       jql += ` ORDER BY updated DESC`;
@@ -603,9 +636,9 @@ export default function App() {
     fetchJiraIssues(config);
   };
 
-  const handleRefresh = async (startDate, endDate, assignees) => {
+  const handleRefresh = async (startDate, endDate, assignees, domain) => {
     if (connectionConfig) {
-      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees });
+      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees, domain });
     }
   };
 

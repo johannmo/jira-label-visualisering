@@ -328,6 +328,29 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
 }
 
+.domain-select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 140px;
+}
+
+.domain-select:hover {
+  border-color: var(--color-primary);
+}
+
+.domain-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
+}
+
 .btn-refresh {
   background: var(--color-primary);
   color: white;
