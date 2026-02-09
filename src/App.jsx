@@ -293,6 +293,8 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
   };
   const [startDate, setStartDate] = useState(localStorage.getItem('jira_start_date') || '');
   const [endDate, setEndDate] = useState(localStorage.getItem('jira_end_date') || '');
+  const [createdStartDate, setCreatedStartDate] = useState(localStorage.getItem('jira_created_start_date') || '');
+  const [createdEndDate, setCreatedEndDate] = useState(localStorage.getItem('jira_created_end_date') || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedAssignees, setSelectedAssignees] = useState(new Set());
   const [selectedDomain, setSelectedDomain] = useState(localStorage.getItem('jira_selected_domain') || '');
@@ -323,9 +325,11 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
   const handleRefresh = async () => {
     localStorage.setItem('jira_start_date', startDate);
     localStorage.setItem('jira_end_date', endDate);
+    localStorage.setItem('jira_created_start_date', createdStartDate);
+    localStorage.setItem('jira_created_end_date', createdEndDate);
     localStorage.setItem('jira_selected_domain', selectedDomain);
     setIsRefreshing(true);
-    await onRefresh(startDate, endDate, Array.from(selectedAssignees), selectedDomain, Array.from(selectedStatuses));
+    await onRefresh(startDate, endDate, createdStartDate, createdEndDate, Array.from(selectedAssignees), selectedDomain, Array.from(selectedStatuses));
     setIsRefreshing(false);
   };
 
@@ -444,20 +448,38 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
         <div className="header-right">
           {!isDemo && (
             <div className="date-filters">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                placeholder="Startdato"
-                title="Startdato"
-              />
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                placeholder="Sluttdato"
-                title="Sluttdato"
-              />
+              <div className="date-filter-group">
+                <span className="date-filter-label">Oppdatert</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  title="Oppdatert frå"
+                />
+                <span className="date-separator">–</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  title="Oppdatert til"
+                />
+              </div>
+              <div className="date-filter-group">
+                <span className="date-filter-label">Oppretta</span>
+                <input
+                  type="date"
+                  value={createdStartDate}
+                  onChange={(e) => setCreatedStartDate(e.target.value)}
+                  title="Oppretta frå"
+                />
+                <span className="date-separator">–</span>
+                <input
+                  type="date"
+                  value={createdEndDate}
+                  onChange={(e) => setCreatedEndDate(e.target.value)}
+                  title="Oppretta til"
+                />
+              </div>
               {domains.length > 0 && (
                 <select
                   value={selectedDomain}
@@ -674,7 +696,7 @@ export default function App() {
     }
   };
 
-  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees, domain, selectedStatuses }) => {
+  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, createdStartDate, createdEndDate, assignees, domain, selectedStatuses }) => {
     setLoading(true);
     setError(null);
 
@@ -691,6 +713,12 @@ export default function App() {
       }
       if (endDate) {
         jql += ` AND updated <= "${endDate}"`;
+      }
+      if (createdStartDate) {
+        jql += ` AND created >= "${createdStartDate}"`;
+      }
+      if (createdEndDate) {
+        jql += ` AND created <= "${createdEndDate}"`;
       }
       if (assignees && assignees.length > 0) {
         const assigneeList = assignees.map(a => `"${a}"`).join(', ');
@@ -783,14 +811,16 @@ export default function App() {
     // Les lagra datoar frå localStorage
     const startDate = localStorage.getItem('jira_start_date') || '';
     const endDate = localStorage.getItem('jira_end_date') || '';
+    const createdStartDate = localStorage.getItem('jira_created_start_date') || '';
+    const createdEndDate = localStorage.getItem('jira_created_end_date') || '';
     const domain = localStorage.getItem('jira_selected_domain') || '';
 
-    fetchJiraIssues({ ...config, selectedStatuses: defaultSelected, startDate, endDate, domain });
+    fetchJiraIssues({ ...config, selectedStatuses: defaultSelected, startDate, endDate, createdStartDate, createdEndDate, domain });
   };
 
-  const handleRefresh = async (startDate, endDate, assignees, domain, selectedStatuses) => {
+  const handleRefresh = async (startDate, endDate, createdStartDate, createdEndDate, assignees, domain, selectedStatuses) => {
     if (connectionConfig) {
-      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees, domain, selectedStatuses });
+      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, createdStartDate, createdEndDate, assignees, domain, selectedStatuses });
     }
   };
 
