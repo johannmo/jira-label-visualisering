@@ -780,7 +780,12 @@ export default function App() {
       .filter(s => s.categoryName !== 'Done')
       .map(s => s.name);
 
-    fetchJiraIssues({ ...config, selectedStatuses: defaultSelected });
+    // Les lagra datoar frå localStorage
+    const startDate = localStorage.getItem('jira_start_date') || '';
+    const endDate = localStorage.getItem('jira_end_date') || '';
+    const domain = localStorage.getItem('jira_selected_domain') || '';
+
+    fetchJiraIssues({ ...config, selectedStatuses: defaultSelected, startDate, endDate, domain });
   };
 
   const handleRefresh = async (startDate, endDate, assignees, domain, selectedStatuses) => {
