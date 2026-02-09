@@ -268,9 +268,29 @@ function ChartSection({ title, data, colors, chartType = 'pie' }) {
   );
 }
 
-function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses }) {
+function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses, currentJql }) {
   const [chartType, setChartType] = useState('pie');
   const [prefixFilter, setPrefixFilter] = useState(null);
+  const [showJql, setShowJql] = useState(false);
+  const [jqlCopied, setJqlCopied] = useState(false);
+
+  const copyJql = async () => {
+    try {
+      await navigator.clipboard.writeText(currentJql);
+      setJqlCopied(true);
+      setTimeout(() => setJqlCopied(false), 2000);
+    } catch {
+      // Fallback for eldre nettlesarar
+      const ta = document.createElement('textarea');
+      ta.value = currentJql;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setJqlCopied(true);
+      setTimeout(() => setJqlCopied(false), 2000);
+    }
+  };
   const [startDate, setStartDate] = useState(localStorage.getItem('jira_start_date') || '');
   const [endDate, setEndDate] = useState(localStorage.getItem('jira_end_date') || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -483,11 +503,32 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses 
               </svg>
             </button>
           </div>
+          {!isDemo && currentJql && (
+            <button
+              onClick={() => setShowJql(v => !v)}
+              className={`btn-jql ${showJql ? 'active' : ''}`}
+              title="Vis JQL-spørjing"
+            >
+              JQL
+            </button>
+          )}
           <button onClick={onDisconnect} className="btn-disconnect">
             Kople frå
           </button>
         </div>
       </header>
+
+      {showJql && currentJql && (
+        <div className="jql-panel">
+          <div className="jql-panel-header">
+            <span className="jql-panel-title">JQL-spørjing</span>
+            <button onClick={copyJql} className="btn-copy-jql">
+              {jqlCopied ? '✓ Kopiert!' : 'Kopier'}
+            </button>
+          </div>
+          <pre className="jql-code">{currentJql}</pre>
+        </div>
+      )}
 
       <div className="filter-bar">
         <span className="filter-label">Vis kategori:</span>
@@ -600,6 +641,7 @@ export default function App() {
   const [isDemo, setIsDemo] = useState(false);
   const [connectionConfig, setConnectionConfig] = useState(null);
   const [availableStatuses, setAvailableStatuses] = useState([]);
+  const [currentJql, setCurrentJql] = useState('');
 
   const fetchJiraStatuses = async ({ host, email, token, project, proxyUrl }) => {
     try {
@@ -659,6 +701,8 @@ export default function App() {
       }
       
       jql += ` ORDER BY updated DESC`;
+
+      setCurrentJql(jql);
       
       // Kall via Cloudflare Worker proxy
       const response = await fetch(proxyUrl, {
@@ -773,7 +817,7 @@ export default function App() {
           )}
         </>
       ) : (
-        <Dashboard issues={issues} onDisconnect={handleDisconnect} isDemo={isDemo} onRefresh={handleRefresh} availableStatuses={availableStatuses} />
+        <Dashboard issues={issues} onDisconnect={handleDisconnect} isDemo={isDemo} onRefresh={handleRefresh} availableStatuses={availableStatuses} currentJql={currentJql} />
       )}
     </div>
   );
