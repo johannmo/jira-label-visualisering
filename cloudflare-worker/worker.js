@@ -35,12 +35,12 @@ export default {
 
     try {
       const body = await request.json();
-      const { jiraHost, email, token, requestBody } = body;
+      const { jiraHost, email, token, requestBody, path, method: reqMethod } = body;
 
       // Valider input
-      if (!jiraHost || !email || !token || !requestBody) {
+      if (!jiraHost || !email || !token || (!requestBody && !path)) {
         return new Response(
-          JSON.stringify({ error: 'Manglar påkravde felt: jiraHost, email, token, requestBody' }),
+          JSON.stringify({ error: 'Manglar påkravde felt: jiraHost, email, token, og requestBody eller path' }),
           { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } }
         );
       }
@@ -53,22 +53,35 @@ export default {
         );
       }
 
-      // Nytt Jira Cloud API: POST til /rest/api/3/search/jql
-      const jiraUrl = `https://${jiraHost}/rest/api/3/search/jql`;
-
       // Lag Basic Auth header
       const auth = btoa(`${email}:${token}`);
 
-      // Kall Jira API med POST
-      const jiraResponse = await fetch(jiraUrl, {
-        method: 'POST',
+      // Bestem URL og metode: generisk path eller standard søke-endepunkt
+      let jiraUrl, fetchMethod, fetchBody;
+      if (path) {
+        jiraUrl = `https://${jiraHost}${path}`;
+        fetchMethod = reqMethod || 'GET';
+        fetchBody = requestBody ? JSON.stringify(requestBody) : undefined;
+      } else {
+        jiraUrl = `https://${jiraHost}/rest/api/3/search/jql`;
+        fetchMethod = 'POST';
+        fetchBody = JSON.stringify(requestBody);
+      }
+
+      // Kall Jira API
+      const fetchOptions = {
+        method: fetchMethod,
         headers: {
           'Authorization': `Basic ${auth}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
-      });
+      };
+      if (fetchBody) {
+        fetchOptions.body = fetchBody;
+      }
+
+      const jiraResponse = await fetch(jiraUrl, fetchOptions);
 
       // Hent respons-body
       const responseData = await jiraResponse.text();

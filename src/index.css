@@ -447,6 +447,102 @@ body {
   flex-wrap: wrap;
 }
 
+/* Status filter */
+.status-filter {
+  padding: 12px 32px;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.status-checkboxes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.status-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.status-checkbox:hover {
+  border-color: var(--color-primary);
+  background: #f0f9ff;
+}
+
+.status-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.status-checkbox input[type="checkbox"]:checked {
+  accent-color: var(--color-primary);
+}
+
+.status-category-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.category-to-do .status-category-badge {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.category-in-progress .status-category-badge {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.category-done .status-category-badge {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-quick-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.status-action-btn {
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.status-action-btn:hover {
+  background: #f0f9ff;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .assignee-checkboxes {
   display: flex;
   gap: 12px;

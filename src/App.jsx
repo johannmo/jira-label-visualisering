@@ -268,7 +268,7 @@ function ChartSection({ title, data, colors, chartType = 'pie' }) {
   );
 }
 
-function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
+function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses }) {
   const [chartType, setChartType] = useState('pie');
   const [prefixFilter, setPrefixFilter] = useState(null);
   const [startDate, setStartDate] = useState(localStorage.getItem('jira_start_date') || '');
@@ -276,13 +276,36 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedAssignees, setSelectedAssignees] = useState(new Set());
   const [selectedDomain, setSelectedDomain] = useState(localStorage.getItem('jira_selected_domain') || '');
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
+
+  // Initialiser statusval når tilgjengelege statusar kjem inn
+  useEffect(() => {
+    if (availableStatuses.length > 0 && selectedStatuses.size === 0) {
+      const defaults = new Set(
+        availableStatuses
+          .filter(s => s.categoryName !== 'Done')
+          .map(s => s.name)
+      );
+      setSelectedStatuses(defaults);
+    }
+  }, [availableStatuses]);
+
+  const toggleStatus = (statusName) => {
+    const newSelected = new Set(selectedStatuses);
+    if (newSelected.has(statusName)) {
+      newSelected.delete(statusName);
+    } else {
+      newSelected.add(statusName);
+    }
+    setSelectedStatuses(newSelected);
+  };
 
   const handleRefresh = async () => {
     localStorage.setItem('jira_start_date', startDate);
     localStorage.setItem('jira_end_date', endDate);
     localStorage.setItem('jira_selected_domain', selectedDomain);
     setIsRefreshing(true);
-    await onRefresh(startDate, endDate, Array.from(selectedAssignees), selectedDomain);
+    await onRefresh(startDate, endDate, Array.from(selectedAssignees), selectedDomain, Array.from(selectedStatuses));
     setIsRefreshing(false);
   };
 
@@ -485,6 +508,39 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh }) {
         ))}
       </div>
 
+      {!isDemo && availableStatuses.length > 0 && (
+        <div className="status-filter">
+          <span className="filter-label">Filtrer etter status:</span>
+          <div className="status-checkboxes">
+            {availableStatuses.map(status => (
+              <label key={status.name} className={`status-checkbox category-${status.categoryName.toLowerCase().replace(/\s+/g, '-')}`}>
+                <input
+                  type="checkbox"
+                  checked={selectedStatuses.has(status.name)}
+                  onChange={() => toggleStatus(status.name)}
+                />
+                <span>{status.name}</span>
+                <span className="status-category-badge">{status.categoryName}</span>
+              </label>
+            ))}
+          </div>
+          <div className="status-quick-actions">
+            <button
+              className="status-action-btn"
+              onClick={() => setSelectedStatuses(new Set(availableStatuses.map(s => s.name)))}
+            >
+              Vel alle
+            </button>
+            <button
+              className="status-action-btn"
+              onClick={() => setSelectedStatuses(new Set())}
+            >
+              Fjern alle
+            </button>
+          </div>
+        </div>
+      )}
+
       {!isDemo && assignees.length > 0 && (
         <div className="assignee-filter">
           <span className="filter-label">Filtrer etter utviklar:</span>
@@ -543,13 +599,50 @@ export default function App() {
   const [issues, setIssues] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
   const [connectionConfig, setConnectionConfig] = useState(null);
+  const [availableStatuses, setAvailableStatuses] = useState([]);
 
-  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees, domain }) => {
+  const fetchJiraStatuses = async ({ host, email, token, project, proxyUrl }) => {
+    try {
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jiraHost: host,
+          email,
+          token,
+          path: `/rest/api/3/project/${project}/statuses`,
+        }),
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      const statusMap = new Map();
+      (Array.isArray(data) ? data : []).forEach(issueType => {
+        (issueType.statuses || []).forEach(status => {
+          if (!statusMap.has(status.name)) {
+            statusMap.set(status.name, {
+              name: status.name,
+              categoryName: status.statusCategory?.name || '',
+            });
+          }
+        });
+      });
+      return Array.from(statusMap.values());
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchJiraIssues = async ({ host, email, token, project, proxyUrl, startDate, endDate, assignees, domain, selectedStatuses }) => {
     setLoading(true);
     setError(null);
 
     try {
-      let jql = `project = ${project} AND statusCategory != Done AND status != Backlog AND labels IS NOT EMPTY`;
+      let jql = `project = ${project} AND labels IS NOT EMPTY`;
+      
+      if (selectedStatuses && selectedStatuses.length > 0) {
+        const statusList = selectedStatuses.map(s => `"${s}"`).join(', ');
+        jql += ` AND status IN (${statusList})`;
+      }
       
       if (startDate) {
         jql += ` AND updated >= "${startDate}"`;
@@ -624,7 +717,7 @@ export default function App() {
     }
   };
 
-  const handleConnect = (config) => {
+  const handleConnect = async (config) => {
     if (config.demo) {
       setIssues(DEMO_ISSUES);
       setIsDemo(true);
@@ -633,12 +726,22 @@ export default function App() {
     }
     setIsDemo(false);
     setConnectionConfig(config);
-    fetchJiraIssues(config);
+
+    // Hent tilgjengelege statusar for prosjektet
+    const statuses = await fetchJiraStatuses(config);
+    setAvailableStatuses(statuses);
+
+    // Standard: vel alle statusar unntatt "Done"-kategorien
+    const defaultSelected = statuses
+      .filter(s => s.categoryName !== 'Done')
+      .map(s => s.name);
+
+    fetchJiraIssues({ ...config, selectedStatuses: defaultSelected });
   };
 
-  const handleRefresh = async (startDate, endDate, assignees, domain) => {
+  const handleRefresh = async (startDate, endDate, assignees, domain, selectedStatuses) => {
     if (connectionConfig) {
-      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees, domain });
+      await fetchJiraIssues({ ...connectionConfig, startDate, endDate, assignees, domain, selectedStatuses });
     }
   };
 
@@ -670,7 +773,7 @@ export default function App() {
           )}
         </>
       ) : (
-        <Dashboard issues={issues} onDisconnect={handleDisconnect} isDemo={isDemo} onRefresh={handleRefresh} />
+        <Dashboard issues={issues} onDisconnect={handleDisconnect} isDemo={isDemo} onRefresh={handleRefresh} availableStatuses={availableStatuses} />
       )}
     </div>
   );
