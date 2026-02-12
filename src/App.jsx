@@ -304,18 +304,18 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
   useEffect(() => {
     if (availableStatuses.length > 0 && selectedStatuses.size === 0) {
       const defaults = new Set(
-        availableStatuses.map(s => s.name)
+        availableStatuses.map(s => s.id)
       );
       setSelectedStatuses(defaults);
     }
   }, [availableStatuses]);
 
-  const toggleStatus = (statusName) => {
+  const toggleStatus = (statusId) => {
     const newSelected = new Set(selectedStatuses);
-    if (newSelected.has(statusName)) {
-      newSelected.delete(statusName);
+    if (newSelected.has(statusId)) {
+      newSelected.delete(statusId);
     } else {
-      newSelected.add(statusName);
+      newSelected.add(statusId);
     }
     setSelectedStatuses(newSelected);
   };
@@ -574,11 +574,11 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
           <span className="filter-label">Filtrer etter status:</span>
           <div className="status-checkboxes">
             {availableStatuses.map(status => (
-              <label key={status.name} className={`status-checkbox category-${status.categoryName.toLowerCase().replace(/\s+/g, '-')}`}>
+              <label key={status.id} className={`status-checkbox category-${status.categoryName.toLowerCase().replace(/\s+/g, '-')}`}>
                 <input
                   type="checkbox"
-                  checked={selectedStatuses.has(status.name)}
-                  onChange={() => toggleStatus(status.name)}
+                  checked={selectedStatuses.has(status.id)}
+                  onChange={() => toggleStatus(status.id)}
                 />
                 <span>{status.name}</span>
                 <span className="status-category-badge">{status.categoryName}</span>
@@ -588,7 +588,7 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
           <div className="status-quick-actions">
             <button
               className="status-action-btn"
-              onClick={() => setSelectedStatuses(new Set(availableStatuses.map(s => s.name)))}
+              onClick={() => setSelectedStatuses(new Set(availableStatuses.map(s => s.id)))}
             >
               Vel alle
             </button>
@@ -680,8 +680,10 @@ export default function App() {
       const statusMap = new Map();
       (Array.isArray(data) ? data : []).forEach(issueType => {
         (issueType.statuses || []).forEach(status => {
-          if (!statusMap.has(status.name)) {
-            statusMap.set(status.name, {
+          const id = status.id || status.name;
+          if (!statusMap.has(id)) {
+            statusMap.set(id, {
+              id: id,
               name: status.name,
               categoryName: status.statusCategory?.name || '',
             });
@@ -702,7 +704,7 @@ export default function App() {
       let jql = `project = ${project} AND labels IS NOT EMPTY`;
       
       if (selectedStatuses && selectedStatuses.length > 0) {
-        const statusList = selectedStatuses.map(s => `"${s}"`).join(', ');
+        const statusList = selectedStatuses.join(', ');
         jql += ` AND status IN (${statusList})`;
       }
       
@@ -816,7 +818,7 @@ export default function App() {
     setAvailableStatuses(statuses);
 
     // Standard: vel alle statusar
-    const defaultSelected = statuses.map(s => s.name);
+    const defaultSelected = statuses.map(s => s.id);
 
     // Les lagra datoar frå localStorage
     const startDate = localStorage.getItem('jira_start_date') || '';
