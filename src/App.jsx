@@ -304,9 +304,7 @@ function Dashboard({ issues, onDisconnect, isDemo, onRefresh, availableStatuses,
   useEffect(() => {
     if (availableStatuses.length > 0 && selectedStatuses.size === 0) {
       const defaults = new Set(
-        availableStatuses
-          .filter(s => s.categoryName !== 'Done')
-          .map(s => s.name)
+        availableStatuses.map(s => s.name)
       );
       setSelectedStatuses(defaults);
     }
@@ -731,49 +729,63 @@ export default function App() {
       jql += ` ORDER BY updated DESC`;
 
       setCurrentJql(jql);
-      
-      // Kall via Cloudflare Worker proxy
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jiraHost: host,
-          email: email,
-          token: token,
-          
-          requestBody: {
-            jql: jql,
-            fields: ['key', 'summary', 'labels', 'assignee'],
-            maxResults: 100,
-          },
-        }),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          throw new Error('Feil e-post eller API token');
-        } else if (response.status === 404) {
-          throw new Error('Fann ikkje prosjektet. Sjekk prosjektnøkkelen.');
-        } else if (response.status === 403) {
-          throw new Error(errorData.error || 'Tilgang nekta');
+      // Hent alle saker med paginering
+      let allIssues = [];
+      let nextPageToken = null;
+      const maxResults = 100;
+
+      do {
+        const requestBody = {
+          jql: jql,
+          fields: ['key', 'summary', 'labels', 'assignee'],
+          maxResults: maxResults,
+        };
+        if (nextPageToken) {
+          requestBody.nextPageToken = nextPageToken;
         }
-        throw new Error(errorData.error || errorData.jiraResponse || `Feil frå proxy: ${response.status}`);
-      }
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
+        const response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jiraHost: host,
+            email: email,
+            token: token,
+            requestBody: requestBody,
+          }),
+        });
 
-      const mappedIssues = (data.issues || []).map(issue => ({
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 401) {
+            throw new Error('Feil e-post eller API token');
+          } else if (response.status === 404) {
+            throw new Error('Fann ikkje prosjektet. Sjekk prosjektnøkkelen.');
+          } else if (response.status === 403) {
+            throw new Error(errorData.error || 'Tilgang nekta');
+          }
+          throw new Error(errorData.error || errorData.jiraResponse || `Feil frå proxy: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        const issues = data.issues || [];
+        allIssues = allIssues.concat(issues);
+        nextPageToken = data.nextPageToken || null;
+      } while (nextPageToken);
+
+      const mappedIssues = allIssues.map(issue => ({
         key: issue.key,
         summary: issue.fields?.summary || '',
         labels: issue.fields?.labels || [],
-        assignee: issue.fields?.assignee?.name || issue.fields?.assignee?.displayName || null,
+        assignee: issue.fields?.assignee?.displayName || issue.fields?.assignee?.name || null,
       }));
 
       setIssues(mappedIssues);
@@ -803,10 +815,8 @@ export default function App() {
     const statuses = await fetchJiraStatuses(config);
     setAvailableStatuses(statuses);
 
-    // Standard: vel alle statusar unntatt "Done"-kategorien
-    const defaultSelected = statuses
-      .filter(s => s.categoryName !== 'Done')
-      .map(s => s.name);
+    // Standard: vel alle statusar
+    const defaultSelected = statuses.map(s => s.name);
 
     // Les lagra datoar frå localStorage
     const startDate = localStorage.getItem('jira_start_date') || '';
